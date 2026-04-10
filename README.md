@@ -301,6 +301,17 @@ swamp model type search jscad
 
 ---
 
+## Благодарности
+
+Этот проект вдохновлён статьями:
+
+- [JSCAD CAD Generation with Swamp and Claude](https://magistr.me/blog/jscad-cad-generation-with-swamp-and-claude/) — генерация CAD-моделей с помощью AI
+- [JSCAD Swamp Setup Guide](https://magistr.me/blog/jscad-swamp-setup-guide/) — настройка окружения для работы с JSCAD и Swamp
+
+Спасибо автору за подробное руководство и вдохновение!
+
+---
+
 ## Ссылки
 
 - [Swamp Documentation](https://github.com/systeminit/swamp)
