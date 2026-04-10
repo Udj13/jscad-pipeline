@@ -1,0 +1,8 @@
+type: '@magistr/jscad-stl-slicer'
+typeVersion: 2026.04.04.2
+id: 2ee2c140-f73d-4750-bd22-8f9ed78cc580
+name: slicer
+version: 1
+tags: {}
+globalArguments: {}
+methods: {}

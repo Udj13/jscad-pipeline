@@ -1,0 +1,74 @@
+script: |
+  const main = (params = {}) => {
+    // ── Datums ──
+    // A: Z axis (vertical, bottom face at Z=0)
+    // B: Y = -outerD/2 (front face)
+    // C: X = 0 (centerline symmetry)
+
+    // ── Outer dimensions ──
+    const outerW = 85;
+    const outerD = 50;
+    const outerH = 25;
+
+    // ── Wall thickness ──
+    const wall = 3;
+
+    // ── Inner cavity (open top, bottom + 4 walls) ──
+    const innerW = outerW - 2 * wall;
+    const innerD = outerD - 2 * wall;
+    const innerH = outerH - wall;
+
+    // ── Centers ──
+    const centerX = 0;
+    const centerY = 0;
+    const outerCenterZ = outerH / 2;
+    const innerCenterZ = wall + innerH / 2;
+
+    // ── Outer shell (rounded edges) ──
+    const outerShell = primitives.roundedCuboid({
+      size: [outerW, outerD, outerH],
+      radius: 2,
+      center: [centerX, centerY, outerCenterZ]
+    });
+
+    // ── Inner cavity (rounded, slightly taller to ensure clean cut) ──
+    const innerCavity = primitives.roundedCuboid({
+      size: [innerW, innerD, innerH + 2],
+      radius: 1,
+      center: [centerX, centerY, innerCenterZ]
+    });
+
+    // ── Base body ──
+    const body = booleans.subtract(outerShell, innerCavity);
+
+    // ── Side grips (ribs on left and right faces, X=±outerW/2) ──
+    const ribCount = 6;
+    const ribW = 0.8;       // rib protrusion depth
+    const ribH = 1.2;       // rib height (along Z)
+    const ribSpacing = (outerH - 8) / (ribCount - 1);  // spacing between rib centers
+    const ribStartZ = 4 + ribH / 2;  // first rib center from bottom
+    const ribD = 30;        // rib width along Y (grip zone length)
+
+    const ribs = [];
+
+    for (let i = 0; i < ribCount; i++) {
+      const ribZ = ribStartZ + i * ribSpacing;
+
+      // Left side ribs (X = -outerW/2)
+      const leftRib = primitives.cuboid({
+        size: [ribW, ribD, ribH],
+        center: [-outerW / 2 - ribW / 2, centerY, ribZ]
+      });
+      ribs.push(leftRib);
+
+      // Right side ribs (X = +outerW/2)
+      const rightRib = primitives.cuboid({
+        size: [ribW, ribD, ribH],
+        center: [outerW / 2 + ribW / 2, centerY, ribZ]
+      });
+      ribs.push(rightRib);
+    }
+
+    return [body, ...ribs];
+  };
+outputFormat: stl

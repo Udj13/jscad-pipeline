@@ -1,0 +1,5 @@
+script: |
+  const main = (params = {}) => {
+    return primitives.cuboid({ size: [20, 10, 5] });
+  };
+outputFormat: stl

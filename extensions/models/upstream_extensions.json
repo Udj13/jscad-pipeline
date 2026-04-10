@@ -1,0 +1,44 @@
+{
+  "@magistr/jscad-cad": {
+    "version": "2026.04.05.2",
+    "pulledAt": "2026-04-08T11:38:02.064Z",
+    "files": [
+      ".swamp/pulled-extensions/models/jscad_cad.ts",
+      ".swamp/pulled-extensions/models/jscad/types.ts",
+      ".swamp/pulled-extensions/models/jscad/script_evaluator.ts",
+      ".swamp/bundles/2e4ea9ae/jscad_cad.js",
+      ".swamp/pulled-extensions/models/reverse-engineering.md",
+      ".swamp/pulled-extensions/models/feature-based-modeling.md",
+      ".swamp/pulled-extensions/models/geometry-positioning.md",
+      ".swamp/pulled-extensions/models/script_evaluator_test.ts",
+      ".swamp/pulled-extensions/models/types_test.ts",
+      ".swamp/pulled-extensions/models/SKILL.md",
+      ".swamp/pulled-extensions/models/jscad-v2-api.md"
+    ],
+    "checksum": "c8180db77b70759af595f52b70453d6a6b65ab6695de6581bb905f3c15be8204",
+    "serverUrl": "https://swamp.club"
+  },
+  "@magistr/jscad-stl-validator": {
+    "version": "2026.04.04.2",
+    "pulledAt": "2026-04-08T11:38:18.808Z",
+    "files": [
+      ".swamp/pulled-extensions/models/jscad_stl_validator.ts",
+      ".swamp/pulled-extensions/models/jscad/stl_validator.ts",
+      ".swamp/bundles/2e4ea9ae/jscad_stl_validator.js",
+      ".swamp/pulled-extensions/models/stl_validator_test.ts"
+    ],
+    "checksum": "b89057b46a8d3bee8f5713299a1e484cb43a7ff62a9ef737ac699852e04e30ae",
+    "serverUrl": "https://swamp.club"
+  },
+  "@magistr/jscad-stl-slicer": {
+    "version": "2026.04.04.2",
+    "pulledAt": "2026-04-08T11:38:30.553Z",
+    "files": [
+      ".swamp/pulled-extensions/models/jscad_stl_slicer.ts",
+      ".swamp/pulled-extensions/models/jscad/stl_slicer.ts",
+      ".swamp/bundles/2e4ea9ae/jscad_stl_slicer.js"
+    ],
+    "checksum": "c0e3b8d618d143e8cc5a686d30d5408206222ab530f52f5675f757e3efb2decf",
+    "serverUrl": "https://swamp.club"
+  }
+}

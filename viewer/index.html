@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JSCAD 3D Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #e8e8e8; color: #333; overflow: hidden; }
+    .toolbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: #fff; padding: 10px 20px; display: flex; gap: 12px; align-items: center;
+      border-bottom: 1px solid #d0d0d0; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .toolbar label { color: #666; font-size: 13px; }
+    .toolbar select {
+      background: #fff; color: #333; border: 1px solid #bbb;
+      padding: 6px 10px; border-radius: 4px; font-size: 13px; cursor: pointer; min-width: 200px;
+    }
+    .toolbar select:focus { outline: none; border-color: #0078d4; }
+    .toolbar button {
+      background: #0078d4; color: #fff; border: none;
+      padding: 6px 16px; border-radius: 4px; font-size: 13px; cursor: pointer;
+    }
+    .toolbar button:hover { background: #005fa3; }
+    .toolbar button.secondary { background: #fff; border: 1px solid #bbb; color: #333; }
+    .toolbar button.secondary:hover { background: #f0f0f0; }
+    .toolbar .spacer { flex: 1; }
+    .toolbar .info { color: #888; font-size: 12px; }
+    #canvas-container { width: 100vw; height: 100vh; }
+    canvas { display: block; }
+    #loading {
+      position: fixed; inset: 0; background: rgba(255,255,255,0.9);
+      display: none; justify-content: center; align-items: center;
+      z-index: 200; flex-direction: column; gap: 16px;
+    }
+    #loading.active { display: flex; }
+    .spinner {
+      width: 36px; height: 36px; border: 3px solid #ddd;
+      border-top-color: #0078d4; border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-text { color: #555; font-size: 14px; }
+    #info-panel {
+      position: fixed; bottom: 16px; left: 16px; z-index: 100;
+      background: #fff; padding: 10px 14px; border-radius: 6px; font-size: 12px;
+      border: 1px solid #d0d0d0; box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      display: none; line-height: 1.6;
+    }
+    #info-panel.visible { display: block; }
+    #info-panel span { color: #888; }
+    #info-panel strong { color: #333; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <label>Model:</label>
+    <select id="modelSelect"><option value="">— select STL —</option></select>
+    <button id="btnLoad" class="secondary">Load</button>
+    <button id="btnLast" class="secondary">Latest</button>
+    <span class="spacer"></span>
+    <button id="btnReset" class="secondary">Reset</button>
+    <button id="btnWire" class="secondary">Wire</button>
+    <button id="btnGrid" class="secondary">Grid</button>
+    <button id="btnAxes" class="secondary">Axes</button>
+    <span class="info" id="statusText"></span>
+  </div>
+  <div id="loading"><div class="spinner"></div><div id="loading-text">Loading...</div></div>
+  <div id="info-panel">
+    <div><span>Triangles:</span> <strong id="info-triangles">—</strong></div>
+    <div><span>Size:</span> <strong id="info-size">—</strong></div>
+    <div><span>File:</span> <strong id="info-file">—</strong></div>
+  </div>
+  <div id="canvas-container"></div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+    }
+  }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+
+    // --- Scene ---
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf5f5f5);
+
+    const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 10000);
+    camera.position.set(80, 60, 80);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+    // --- Controls ---
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+
+    // --- Lights ---
+    // Ambient — базовое заполнение
+    scene.add(new THREE.AmbientLight(0xffffff, 1.4));
+    // Основной — сверху-справа
+    const dir = new THREE.DirectionalLight(0xffffff, 2.0);
+    dir.position.set(50, 80, 50);
+    scene.add(dir);
+    // Заполняющий — слева-спереди (освещает тёмные грани)
+    const fill = new THREE.DirectionalLight(0xffffff, 1.2);
+    fill.position.set(-40, 30, 40);
+    scene.add(fill);
+    // Контровой — сзади-сверху (подчёркивает рёбра)
+    const rim = new THREE.DirectionalLight(0xffffff, 0.6);
+    rim.position.set(0, 50, -50);
+    scene.add(rim);
+
+    // --- Grid & Axes ---
+    const grid = new THREE.GridHelper(200, 40, 0xcccccc, 0xe0e0e0);
+    scene.add(grid);
+    const axes = new THREE.AxesHelper(30);
+    scene.add(axes);
+
+    // --- Material ---
+    const material = new THREE.MeshStandardMaterial({
+      color: 0xc0c0c0, metalness: 0.1, roughness: 0.7, side: THREE.DoubleSide
+    });
+
+    let currentMesh = null;
+    let wireframeMode = false;
+    const loader = new STLLoader();
+
+    // --- Resize ---
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    // --- Animate ---
+    (function loop() {
+      requestAnimationFrame(loop);
+      controls.update();
+      renderer.render(scene, camera);
+    })();
+
+    // --- Load STL ---
+    function loadSTL(path) {
+      try { const u = new URL(path, location.origin); path = u.pathname; } catch (e) {}
+      if (!path.startsWith('/')) path = '/' + path;
+
+      const loading = document.getElementById('loading');
+      const status = document.getElementById('statusText');
+      loading.classList.add('active');
+      status.textContent = 'Loading...';
+
+      if (currentMesh) { scene.remove(currentMesh); currentMesh.geometry.dispose(); }
+
+      loader.load(path,
+        (geometry) => {
+          geometry.computeVertexNormals();
+          currentMesh = new THREE.Mesh(geometry, material);
+          scene.add(currentMesh);
+
+          const bbox = new THREE.Box3().setFromObject(currentMesh);
+          const center = bbox.getCenter(new THREE.Vector3());
+          const size = bbox.getSize(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const dist = maxDim * 2.5;
+
+          currentMesh.position.sub(center);
+          currentMesh.position.y += size.y / 2;
+          camera.position.set(dist, dist * 0.7, dist);
+          controls.target.set(0, size.y / 2, 0);
+          controls.update();
+
+          const tris = geometry.index ? geometry.index.count / 3 : geometry.attributes.position.count / 3;
+          document.getElementById('info-triangles').textContent = Math.round(tris).toLocaleString();
+          document.getElementById('info-size').textContent = `${size.x.toFixed(1)} × ${size.y.toFixed(1)} × ${size.z.toFixed(1)}`;
+          const name = path.split('/').pop();
+          document.getElementById('info-file').textContent = name;
+          document.getElementById('info-panel').classList.add('visible');
+          loading.classList.remove('active');
+          status.textContent = `✓ ${name}`;
+        },
+        (p) => { if (p.total) document.getElementById('loading-text').textContent = `Loading... ${Math.round(p.loaded/p.total*100)}%`; },
+        (err) => { loading.classList.remove('active'); status.textContent = '✗ Error'; console.error(err); }
+      );
+    }
+
+    // --- Discover ---
+    async function discoverModels() {
+      try {
+        const resp = await fetch('/');
+        const text = await resp.text();
+        const doc = new DOMParser().parseFromString(text, 'text/html');
+        const links = doc.querySelectorAll('a[href$=".stl"]');
+        const sel = document.getElementById('modelSelect');
+        sel.innerHTML = '<option value="">— select STL —</option>';
+        links.forEach(a => {
+          let h = a.getAttribute('href');
+          if (!h.startsWith('/')) h = location.origin + '/' + h;
+          const o = document.createElement('option');
+          o.value = h; o.textContent = decodeURIComponent(h.split('/').pop() || h);
+          sel.appendChild(o);
+        });
+        return links.length > 0;
+      } catch (e) { return false; }
+    }
+
+    // --- Wire up buttons ---
+    document.getElementById('btnLoad').onclick = () => {
+      const v = document.getElementById('modelSelect').value;
+      if (v) loadSTL(v);
+    };
+    document.getElementById('btnLast').onclick = async () => {
+      await discoverModels();
+      const sel = document.getElementById('modelSelect');
+      if (sel.options.length > 1) { sel.selectedIndex = sel.options.length - 1; loadSTL(sel.value); }
+    };
+    document.getElementById('btnReset').onclick = () => {
+      if (currentMesh) { loadSTL(document.getElementById('modelSelect').value); }
+      else { camera.position.set(80, 60, 80); controls.target.set(0, 0, 0); controls.update(); }
+    };
+    document.getElementById('btnWire').onclick = () => { wireframeMode = !wireframeMode; material.wireframe = wireframeMode; };
+    document.getElementById('btnGrid').onclick = () => { grid.visible = !grid.visible; };
+    document.getElementById('btnAxes').onclick = () => { axes.visible = !axes.visible; };
+
+    // Init
+    discoverModels();
+    const p = new URLSearchParams(location.search);
+    const m = p.get('model');
+    if (m) setTimeout(() => loadSTL(m), 300);
+  </script>
+</body>
+</html>
