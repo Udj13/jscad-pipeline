@@ -1,0 +1,191 @@
+script: |
+  const main = (params = {}) => {
+    // ── Phone dimensions ──
+    const phoneW = 75;      // phone width
+    const phoneH = 150;     // phone height
+    const phoneT = 8;       // phone thickness
+
+    // ── Case parameters ──
+    const wall = 3.5;       // wall thickness
+    const bottomWall = 3.5; // bottom thickness
+    const lipHeight = 1.5;  // protective lip above screen
+    const tolerance = 0.4;  // clearance around phone
+
+    // ── Camera cutout (top-left corner) ──
+    const cameraW = 25;     // camera module width
+    const cameraH = 50;     // camera module height
+    const cameraOffsetX = 12; // distance from left edge
+    const cameraOffsetY = 10; // distance from top edge
+    const cameraDepth = 2;  // cutout depth (for protruding camera)
+
+    // ── Button cutouts ──
+    const buttonW = 3;      // button cutout width
+    const buttonH = 12;     // button cutout height
+    const volumeY = 40;     // volume buttons position from top
+    const powerY = 60;      // power button position from top
+
+    // ── Charging port cutout ──
+    const portW = 12;       // port width
+    const portH = 6;        // port height
+
+    // ── Calculated dimensions ──
+    const innerW = phoneW + 2 * tolerance;
+    const innerH = phoneH + 2 * tolerance;
+    const innerT = phoneT + tolerance;
+    
+    const outerW = innerW + 2 * wall;
+    const outerH = innerH + 2 * wall;
+    const outerT = innerT + bottomWall;
+    const totalHeight = outerT + lipHeight;
+
+    // ── Main body (outer shell) ──
+    const outerShell = primitives.roundedCuboid({
+      size: [outerW, outerH, totalHeight],
+      roundRadius: 3,
+      segments: 16,
+      center: [0, 0, totalHeight / 2]
+    });
+
+    // ── Inner cavity (phone slot) ──
+    const innerCavity = primitives.roundedCuboid({
+      size: [innerW, innerH, innerT + lipHeight + 1],
+      roundRadius: 1.5,
+      segments: 16,
+      center: [0, 0, bottomWall + (innerT + lipHeight + 1) / 2]
+    });
+
+    // ── Subtract cavity from shell ──
+    let caseBody = booleans.subtract(outerShell, innerCavity);
+
+    // ── Tactical pattern on back wall ──
+    const patternDepth = 1.0;  // deep embossing for brutal look
+    const patternElements = [];
+
+    // Triangular pattern
+    const triSize = 8;  // triangle side length
+    const triHeight = triSize * Math.sqrt(3) / 2;
+    const triSpacing = triSize * 0.9;
+    const triRows = Math.floor(innerH / triHeight) + 1;
+    const triCols = Math.floor(innerW / triSpacing) + 1;
+
+    for (let row = 0; row < triRows; row++) {
+      for (let col = 0; col < triCols; col++) {
+        const offsetX = (row % 2) * (triSpacing / 2);
+        const x = -innerW / 2 + col * triSpacing + offsetX;
+        const y = -innerH / 2 + row * triHeight;
+        
+        // Skip triangles in camera area
+        const inCameraZone = (
+          x > -innerW / 2 + cameraOffsetX - 8 &&
+          x < -innerW / 2 + cameraOffsetX + cameraW + 8 &&
+          y > innerH / 2 - cameraOffsetY - cameraH - 8 &&
+          y < innerH / 2 - cameraOffsetY + 8
+        );
+        
+        if (!inCameraZone && Math.abs(x) < innerW / 2 - 5 && Math.abs(y) < innerH / 2 - 5) {
+          // Create triangle using extruded polygon
+          const pointUp = (row + col) % 2 === 0;
+          const h = triSize * Math.sqrt(3) / 2;
+          
+          const points = pointUp ? [
+            [x, y + h * 2/3, 0],
+            [x - triSize/2, y - h * 1/3, 0],
+            [x + triSize/2, y - h * 1/3, 0]
+          ] : [
+            [x, y - h * 2/3, 0],
+            [x + triSize/2, y + h * 1/3, 0],
+            [x - triSize/2, y + h * 1/3, 0]
+          ];
+          
+          const triBase = primitives.polygon({ points: points });
+          const tri = extrusions.extrudeLinear(
+            { height: patternDepth + 0.5 },
+            triBase
+          );
+          const movedTri = transforms.translate([0, 0, -patternDepth / 2], tri);
+          patternElements.push(movedTri);
+        }
+      }
+    }
+
+    // Subtract pattern from case body
+    for (const element of patternElements) {
+      caseBody = booleans.subtract(caseBody, element);
+    }
+
+    // ── Camera cutout (on back wall - bottom of case, top-left corner) ──
+    // The back of the phone is at Z=0 (bottom wall)
+    // Make it deep enough to cut through the entire bottom wall
+    const cameraCutout = primitives.roundedCuboid({
+      size: [cameraW, cameraH, bottomWall + 4],
+      roundRadius: 0.5,
+      segments: 12,
+      center: [
+        -innerW / 2 + cameraOffsetX + cameraW / 2,
+        innerH / 2 - cameraOffsetY - cameraH / 2,
+        bottomWall / 2
+      ]
+    });
+    caseBody = booleans.subtract(caseBody, cameraCutout);
+
+    // ── Volume buttons cutout (left side) ──
+    const volumeCutout = primitives.cuboid({
+      size: [wall + 2, buttonW, buttonH],
+      center: [
+        -outerW / 2,
+        outerH / 2 - volumeY,
+        bottomWall + innerT / 2
+      ]
+    });
+    caseBody = booleans.subtract(caseBody, volumeCutout);
+
+    // ── Power button cutout (right side) ──
+    const powerCutout = primitives.cuboid({
+      size: [wall + 2, buttonW, buttonH],
+      center: [
+        outerW / 2,
+        outerH / 2 - powerY,
+        bottomWall + innerT / 2
+      ]
+    });
+    caseBody = booleans.subtract(caseBody, powerCutout);
+
+    // ── Charging port cutout (bottom edge, through-hole) ──
+    const portCutout = primitives.roundedCuboid({
+      size: [portW, wall + 4, portH],
+      roundRadius: 1,
+      segments: 8,
+      center: [0, -outerH / 2, bottomWall + portH / 2]
+    });
+    caseBody = booleans.subtract(caseBody, portCutout);
+
+    // ── Grip texture (small ribs on sides) ──
+    const ribs = [];
+    const ribCount = 8;
+    const ribW = 0.6;
+    const ribH = 1.0;
+    const ribSpacing = (outerH - 40) / (ribCount - 1);
+    const ribStartY = -outerH / 2 + 20;
+
+    for (let i = 0; i < ribCount; i++) {
+      const ribY = ribStartY + i * ribSpacing;
+      const ribZ = bottomWall + innerT / 2;
+
+      // Left ribs
+      const leftRib = primitives.cuboid({
+        size: [ribW, 2, ribH],
+        center: [-outerW / 2 - ribW / 2, ribY, ribZ]
+      });
+      ribs.push(leftRib);
+
+      // Right ribs
+      const rightRib = primitives.cuboid({
+        size: [ribW, 2, ribH],
+        center: [outerW / 2 + ribW / 2, ribY, ribZ]
+      });
+      ribs.push(rightRib);
+    }
+
+    return [caseBody, ...ribs];
+  };
+outputFormat: stl
